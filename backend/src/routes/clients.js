@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { requireAdmin, HttpError } from '../auth.js';
+import { config } from '../config.js';
 
 const router = Router();
 router.use(requireAdmin);
 
-const CLIENT_COLUMNS = 'u.id, u.name, u.email, u.phone, u.notes, u.created_at, u.password_hash IS NOT NULL AS has_account';
+const toLocale = (l) => (config.locales.includes(l) ? l : config.defaultLocale);
+
+const CLIENT_COLUMNS = 'u.id, u.name, u.email, u.phone, u.notes, u.locale, u.created_at, u.password_hash IS NOT NULL AS has_account';
 
 router.get('/', (req, res) => {
   const q = `%${String(req.query.q ?? '').trim()}%`;
@@ -26,21 +29,21 @@ router.get('/', (req, res) => {
 
 // Add a client manually (e.g. walk-in or phone booking) — no password needed.
 router.post('/', (req, res) => {
-  const { name, email, phone, notes = '' } = req.body ?? {};
-  if (!name?.trim()) throw new HttpError(400, 'Name is required');
+  const { name, email, phone, notes = '', locale } = req.body ?? {};
+  if (!name?.trim()) throw new HttpError(400, 'Name is required', 'name_required');
   const normalized = email?.trim() ? email.trim().toLowerCase() : null;
   if (normalized && db.prepare('SELECT 1 FROM users WHERE email = ?').get(normalized)) {
-    throw new HttpError(409, 'A client with this email already exists');
+    throw new HttpError(409, 'A client with this email already exists', 'email_taken');
   }
   const { lastInsertRowid } = db
-    .prepare(`INSERT INTO users (name, email, phone, notes, role) VALUES (?, ?, ?, ?, 'client')`)
-    .run(name.trim(), normalized, phone?.trim() || null, notes);
+    .prepare(`INSERT INTO users (name, email, phone, notes, role, locale) VALUES (?, ?, ?, ?, 'client', ?)`)
+    .run(name.trim(), normalized, phone?.trim() || null, notes, toLocale(locale));
   res.status(201).json(db.prepare(`SELECT ${CLIENT_COLUMNS} FROM users u WHERE id = ?`).get(lastInsertRowid));
 });
 
 router.get('/:id', (req, res) => {
   const client = db.prepare(`SELECT ${CLIENT_COLUMNS} FROM users u WHERE id = ? AND role = 'client'`).get(req.params.id);
-  if (!client) throw new HttpError(404, 'Client not found');
+  if (!client) throw new HttpError(404, 'Client not found', 'not_found');
   const appointments = db
     .prepare(
       `SELECT a.*, s.name AS service_name, s.price
@@ -52,12 +55,12 @@ router.get('/:id', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, email, phone, notes } = req.body ?? {};
-  if (!name?.trim()) throw new HttpError(400, 'Name is required');
+  const { name, email, phone, notes, locale } = req.body ?? {};
+  if (!name?.trim()) throw new HttpError(400, 'Name is required', 'name_required');
   const { changes } = db
-    .prepare(`UPDATE users SET name = ?, email = ?, phone = ?, notes = ? WHERE id = ? AND role = 'client'`)
-    .run(name.trim(), email?.trim().toLowerCase() || null, phone?.trim() || null, notes ?? '', req.params.id);
-  if (!changes) throw new HttpError(404, 'Client not found');
+    .prepare(`UPDATE users SET name = ?, email = ?, phone = ?, notes = ?, locale = ? WHERE id = ? AND role = 'client'`)
+    .run(name.trim(), email?.trim().toLowerCase() || null, phone?.trim() || null, notes ?? '', toLocale(locale), req.params.id);
+  if (!changes) throw new HttpError(404, 'Client not found', 'not_found');
   res.json(db.prepare(`SELECT ${CLIENT_COLUMNS} FROM users u WHERE id = ?`).get(req.params.id));
 });
 

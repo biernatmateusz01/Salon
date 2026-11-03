@@ -1,13 +1,14 @@
 // Service worker: cache-first for static assets, network-first for pages with an offline fallback.
 // API requests are never cached so bookings always reflect live availability.
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `static-${VERSION}`;
 const PAGE_CACHE = `pages-${VERSION}`;
-const OFFLINE_URL = "/offline";
+const LOCALES = ["pl", "en", "es", "ru"];
+const offlineUrl = (lang) => `/${lang}/offline`;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(PAGE_CACHE).then((cache) => cache.addAll([OFFLINE_URL, "/icon-192.png", "/icon-512.png"])),
+    caches.open(PAGE_CACHE).then((cache) => cache.addAll([...LOCALES.map(offlineUrl), "/icon-192.png", "/icon-512.png"])),
   );
   self.skipWaiting();
 });
@@ -49,7 +50,11 @@ self.addEventListener("fetch", (event) => {
           caches.open(PAGE_CACHE).then((c) => c.put(request, copy));
           return res;
         })
-        .catch(async () => (await caches.match(request)) || caches.match(OFFLINE_URL)),
+        .catch(async () => {
+          // Fall back to the offline page in the language of the requested URL.
+          const lang = url.pathname.split("/")[1];
+          return (await caches.match(request)) || caches.match(offlineUrl(LOCALES.includes(lang) ? lang : "en"));
+        }),
     );
   }
 });

@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/config";
+
 export type Role = "client" | "admin";
 
 export interface User {
@@ -6,6 +8,7 @@ export interface User {
   email: string | null;
   phone: string | null;
   role: Role;
+  locale: Locale;
   notes: string;
   created_at: string;
 }
@@ -43,6 +46,7 @@ export interface Client {
   email: string | null;
   phone: string | null;
   notes: string;
+  locale: Locale;
   created_at: string;
   has_account: number;
   visits?: number;

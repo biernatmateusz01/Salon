@@ -2,10 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getToken, setSession } from "./session";
+import { defaultLocale, dictionaries, hasLocale } from "@/i18n";
+
+/** Translate an API error code into the page's current language. */
+function errorText(code: string, fallback?: string) {
+  const lang = document.documentElement.lang;
+  const errors = dictionaries[hasLocale(lang) ? lang : defaultLocale].errors;
+  return errors[code] ?? fallback ?? errors.error;
+}
 
 export class ApiError extends Error {
   constructor(
     public status: number,
+    public code: string,
     message: string,
   ) {
     super(message);
@@ -23,11 +32,16 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
       ...headers,
     },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
+  }).catch(() => {
+    throw new ApiError(0, "network", errorText("network"));
   });
   if (res.status === 401 && token) setSession(null);
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
+  if (!res.ok) {
+    const code = data.code ?? (res.status >= 500 ? "server_error" : "error");
+    throw new ApiError(res.status, code, errorText(code, data.error));
+  }
   return data as T;
 }
 

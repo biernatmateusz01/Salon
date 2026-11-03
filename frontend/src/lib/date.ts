@@ -1,4 +1,5 @@
 // Dates are handled as local "YYYY-MM-DD" / "YYYY-MM-DDTHH:mm" strings, matching the API.
+// Locale-aware formatting lives in useI18n().fmt.
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -10,6 +11,8 @@ export const parseDate = (s: string) => {
 };
 
 export const today = () => toDateStr(new Date());
+
+export const nowLocal = () => `${today()}T${pad(new Date().getHours())}:${pad(new Date().getMinutes())}`;
 
 export function addDays(s: string, days: number) {
   const d = parseDate(s);
@@ -29,12 +32,3 @@ export const toMinutes = (hhmm: string) => {
 };
 
 export const timeOf = (dt: string) => dt.slice(11, 16);
-
-const fmt = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, opts);
-export const formatDay = (s: string) => fmt({ weekday: "short", day: "numeric", month: "short" }).format(parseDate(s));
-export const formatLongDay = (s: string) =>
-  fmt({ weekday: "long", day: "numeric", month: "long" }).format(parseDate(s));
-export const formatWeekday = (s: string) => fmt({ weekday: "short" }).format(parseDate(s));
-
-export const formatPrice = (n: number) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: "PLN", maximumFractionDigits: 0 }).format(n);

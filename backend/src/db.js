@@ -44,6 +44,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appt_start ON appointments(start_at);
 `);
 
+// Lightweight migrations for databases created by earlier versions.
+const hasColumn = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+if (!hasColumn('users', 'locale')) db.exec(`ALTER TABLE users ADD COLUMN locale TEXT NOT NULL DEFAULT '${config.defaultLocale}'`);
+if (!hasColumn('appointments', 'reminder_sent_at')) db.exec('ALTER TABLE appointments ADD COLUMN reminder_sent_at TEXT');
+
 // Seed an admin account and a few default services on first run.
 const hasAdmin = db.prepare(`SELECT 1 FROM users WHERE role = 'admin' LIMIT 1`).get();
 if (!hasAdmin) {

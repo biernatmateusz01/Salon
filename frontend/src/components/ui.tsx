@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { useSession } from "@/lib/session";
 import type { AppointmentStatus, Role } from "@/lib/types";
+import { useI18n } from "@/i18n/I18nProvider";
 
-export function Spinner({ label = "Loading…" }: { label?: string }) {
+export function Spinner({ label }: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted">
-      <Loader2 className="size-4 animate-spin" /> {label}
+      <Loader2 className="size-4 animate-spin" /> {label ?? t.common.loading}
     </div>
   );
 }
@@ -38,17 +40,11 @@ const STATUS_STYLES: Record<AppointmentStatus, string> = {
   cancelled: "bg-surface-2 text-muted line-through",
   no_show: "bg-danger/10 text-danger",
 };
-const STATUS_LABELS: Record<AppointmentStatus, string> = {
-  booked: "Booked",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  no_show: "No-show",
-};
-
 export function StatusBadge({ status }: { status: AppointmentStatus }) {
+  const { t } = useI18n();
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
-      {STATUS_LABELS[status]}
+      {t.status[status]}
     </span>
   );
 }
@@ -64,6 +60,7 @@ export function Modal({
   title: string;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -83,7 +80,7 @@ export function Modal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-xl font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-surface-2" aria-label="Close">
+          <button onClick={onClose} className="rounded-full p-1.5 text-muted hover:bg-surface-2" aria-label={t.common.close}>
             <X className="size-5" />
           </button>
         </div>
@@ -97,24 +94,26 @@ export function Modal({
 export function RequireRole({ role, children }: { role: Role; children: React.ReactNode }) {
   const session = useSession();
   const router = useRouter();
+  const { href } = useI18n();
   const allowed = session && session.user.role === role;
 
   useEffect(() => {
-    if (session === null) router.replace("/login");
-    else if (session && session.user.role !== role) router.replace(session.user.role === "admin" ? "/admin" : "/");
-  }, [session, role, router]);
+    if (session === null) router.replace(href("/login"));
+    else if (session && session.user.role !== role) router.replace(href(session.user.role === "admin" ? "/admin" : "/"));
+  }, [session, role, router, href]);
 
   if (!allowed) return <Spinner />;
   return <>{children}</>;
 }
 
 export function EmptyState({ title, text, cta }: { title: string; text: string; cta?: { href: string; label: string } }) {
+  const { href } = useI18n();
   return (
     <div className="card flex flex-col items-center gap-2 px-6 py-14 text-center">
       <p className="font-display text-lg font-semibold">{title}</p>
       <p className="max-w-sm text-sm text-muted">{text}</p>
       {cta && (
-        <Link href={cta.href} className="btn-primary mt-3">
+        <Link href={href(cta.href)} className="btn-primary mt-3">
           {cta.label}
         </Link>
       )}

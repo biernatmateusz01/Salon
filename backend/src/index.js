@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import serviceRoutes from './routes/services.js';
 import clientRoutes from './routes/clients.js';
 import appointmentRoutes from './routes/appointments.js';
+import { startReminderLoop } from './reminders.js';
 
 const app = express();
 app.use(cors({ origin: config.corsOrigin }));
@@ -18,10 +19,16 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 
-app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((_req, res) => res.status(404).json({ error: 'Not found', code: 'not_found' }));
 app.use((err, _req, res, _next) => {
   if (!err.status) console.error(err);
-  res.status(err.status ?? 500).json({ error: err.status ? err.message : 'Internal server error' });
+  res.status(err.status ?? 500).json({
+    error: err.status ? err.message : 'Internal server error',
+    code: err.status ? (err.code ?? 'error') : 'server_error',
+  });
 });
 
-app.listen(config.port, () => console.log(`API listening on http://localhost:${config.port}`));
+app.listen(config.port, () => {
+  console.log(`API listening on http://localhost:${config.port}`);
+  startReminderLoop();
+});

@@ -12,11 +12,11 @@ router.get('/', (req, res) => {
 
 function parseService(body) {
   const { name, description = '', duration_min, price } = body ?? {};
-  if (!name?.trim()) throw new HttpError(400, 'Name is required');
+  if (!name?.trim()) throw new HttpError(400, 'Name is required', 'name_required');
   const duration = Number(duration_min);
   const cost = Number(price);
-  if (!Number.isInteger(duration) || duration < 5) throw new HttpError(400, 'Duration must be at least 5 minutes');
-  if (!(cost >= 0)) throw new HttpError(400, 'Price must be a positive number');
+  if (!Number.isInteger(duration) || duration < 5) throw new HttpError(400, 'Duration must be at least 5 minutes', 'invalid_duration');
+  if (!(cost >= 0)) throw new HttpError(400, 'Price must be a positive number', 'invalid_price');
   return { name: name.trim(), description, duration, cost };
 }
 
@@ -34,7 +34,7 @@ router.put('/:id', requireAdmin, (req, res) => {
   const { changes } = db
     .prepare('UPDATE services SET name = ?, description = ?, duration_min = ?, price = ?, active = ? WHERE id = ?')
     .run(s.name, s.description, s.duration, s.cost, active, req.params.id);
-  if (!changes) throw new HttpError(404, 'Service not found');
+  if (!changes) throw new HttpError(404, 'Service not found', 'not_found');
   res.json(db.prepare('SELECT * FROM services WHERE id = ?').get(req.params.id));
 });
 

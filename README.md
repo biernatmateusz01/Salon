@@ -34,6 +34,18 @@ Change it with `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `backend/.env` (see `backend/
 - Client list with search, notes, visit history and total spent
 - Manage services (name, duration, price, hide/show)
 
+**Languages** — Polish, English, Spanish, Russian
+- URLs carry the language (`/pl/book`, `/en/book`…); `src/proxy.ts` redirects `/` using the saved choice, then the browser's language
+- Language switcher in the header; the choice is saved in a cookie and on the user's account
+- Translations live in `frontend/src/i18n/dictionaries/*.ts` (add a key to `en.ts` and TypeScript flags the other files)
+- API errors return a `code` that the frontend translates
+
+**24h reminders** — email (any SMTP server) and SMS ([SMSAPI.pl](https://www.smsapi.pl))
+- The backend checks every 5 minutes and sends each booked visit one reminder in the client's language
+- Rescheduling a visit re-arms its reminder
+- Without SMTP/SMSAPI credentials, messages are only printed to the API console (safe for local dev)
+- Check your settings: `npm --prefix backend run notify:test -- --email you@example.com --phone 500600700 --locale pl`
+
 **PWA**
 - Web app manifest with generated icons (`src/app/manifest.ts`, `icon-*.png` routes)
 - Service worker (`public/sw.js`): caches static assets, network-first pages with an offline fallback; API calls are never cached. Registered only in production builds.
@@ -49,6 +61,11 @@ To test install/offline behaviour: `npm run build && npm start`.
 | backend | `JWT_SECRET` | `dev-secret-change-me` (**change in production**) |
 | backend | `DB_PATH` | `backend/data/salon.db` |
 | backend | `CORS_ORIGIN` | `http://localhost:3000` |
+| backend | `SALON_NAME`, `SALON_ADDRESS` | used in reminder messages |
+| backend | `DEFAULT_LOCALE` | `pl` (language for clients added by the salon) |
+| backend | `REMINDERS_ENABLED`, `REMINDER_HOURS_BEFORE` | `true`, `24` |
+| backend | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | email; empty = console only |
+| backend | `SMSAPI_TOKEN`, `SMSAPI_FROM`, `SMSAPI_TEST` | SMS; empty = console only |
 | frontend | `API_URL` | `http://localhost:4000` |
 
 Opening hours and slot length live in `backend/src/config.js`.
@@ -58,7 +75,7 @@ Opening hours and slot length live in `backend/src/config.js`.
 | Method | Path | Who |
 | --- | --- | --- |
 | POST | `/api/auth/register`, `/api/auth/login` | public |
-| GET | `/api/auth/me` | signed in |
+| GET/PATCH | `/api/auth/me` (PATCH: `{ locale }`) | signed in |
 | GET | `/api/services` | public |
 | POST/PUT/DELETE | `/api/services/:id?` | admin |
 | GET | `/api/appointments/availability?date=&serviceId=` | public |

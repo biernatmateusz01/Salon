@@ -15,7 +15,7 @@ const SELECT_APPT = `
 
 function getService(id) {
   const service = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
-  if (!service) throw new HttpError(404, 'Service not found');
+  if (!service) throw new HttpError(404, 'Service not found', 'not_found');
   return service;
 }
 
@@ -35,7 +35,7 @@ function withinOpeningHours(start, end) {
 // Public: free slots for a given day and service.
 router.get('/availability', (req, res) => {
   const { date, serviceId } = req.query;
-  if (!isDate(date)) throw new HttpError(400, 'date must be YYYY-MM-DD');
+  if (!isDate(date)) throw new HttpError(400, 'date must be YYYY-MM-DD', 'invalid_input');
   const service = getService(serviceId);
   const hours = config.hours[weekday(date)];
   if (!hours) return res.json({ date, open: false, slots: [] });
@@ -88,18 +88,18 @@ router.post('/', (req, res) => {
   const { serviceId, start, notes = '' } = req.body ?? {};
   const isAdmin = req.user.role === 'admin';
   const clientId = isAdmin ? Number(req.body.clientId) : req.user.id;
-  if (!clientId) throw new HttpError(400, 'clientId is required');
-  if (!isDateTime(start)) throw new HttpError(400, 'start must be YYYY-MM-DDTHH:mm');
+  if (!clientId) throw new HttpError(400, 'clientId is required', 'invalid_input');
+  if (!isDateTime(start)) throw new HttpError(400, 'start must be YYYY-MM-DDTHH:mm', 'invalid_input');
 
   const service = getService(serviceId);
-  if (!service.active && !isAdmin) throw new HttpError(400, 'Service is not available');
+  if (!service.active && !isAdmin) throw new HttpError(400, 'Service is not available', 'service_unavailable');
   const end = addMinutes(start, service.duration_min);
 
   if (!isAdmin) {
-    if (start <= nowLocal()) throw new HttpError(400, 'Cannot book in the past');
-    if (!withinOpeningHours(start, end)) throw new HttpError(400, 'Outside opening hours');
+    if (start <= nowLocal()) throw new HttpError(400, 'Cannot book in the past', 'past_time');
+    if (!withinOpeningHours(start, end)) throw new HttpError(400, 'Outside opening hours', 'outside_hours');
   }
-  if (hasOverlap(start, end)) throw new HttpError(409, 'That time slot is already taken');
+  if (hasOverlap(start, end)) throw new HttpError(409, 'That time slot is already taken', 'slot_taken');
 
   const { lastInsertRowid } = db
     .prepare('INSERT INTO appointments (client_id, service_id, start_at, end_at, notes) VALUES (?, ?, ?, ?, ?)')
@@ -109,29 +109,31 @@ router.post('/', (req, res) => {
 
 router.patch('/:id', (req, res) => {
   const appt = db.prepare('SELECT * FROM appointments WHERE id = ?').get(req.params.id);
-  if (!appt) throw new HttpError(404, 'Appointment not found');
+  if (!appt) throw new HttpError(404, 'Appointment not found', 'not_found');
   const isAdmin = req.user.role === 'admin';
 
   if (!isAdmin) {
     // Clients may only cancel their own upcoming bookings.
-    if (appt.client_id !== req.user.id) throw new HttpError(404, 'Appointment not found');
-    if (req.body.status !== 'cancelled') throw new HttpError(403, 'Clients can only cancel appointments');
-    if (appt.status !== 'booked' || appt.start_at <= nowLocal()) throw new HttpError(400, 'This appointment can no longer be cancelled');
+    if (appt.client_id !== req.user.id) throw new HttpError(404, 'Appointment not found', 'not_found');
+    if (req.body.status !== 'cancelled') throw new HttpError(403, 'Clients can only cancel appointments', 'forbidden');
+    if (appt.status !== 'booked' || appt.start_at <= nowLocal()) throw new HttpError(400, 'This appointment can no longer be cancelled', 'cannot_cancel');
     db.prepare(`UPDATE appointments SET status = 'cancelled' WHERE id = ?`).run(appt.id);
     return res.json(db.prepare(`${SELECT_APPT} WHERE a.id = ?`).get(appt.id));
   }
 
   const status = req.body.status ?? appt.status;
-  if (!['booked', 'completed', 'cancelled', 'no_show'].includes(status)) throw new HttpError(400, 'Invalid status');
+  if (!['booked', 'completed', 'cancelled', 'no_show'].includes(status)) throw new HttpError(400, 'Invalid status', 'invalid_input');
   const serviceId = req.body.serviceId ?? appt.service_id;
   const start = req.body.start ?? appt.start_at;
-  if (!isDateTime(start)) throw new HttpError(400, 'start must be YYYY-MM-DDTHH:mm');
+  if (!isDateTime(start)) throw new HttpError(400, 'start must be YYYY-MM-DDTHH:mm', 'invalid_input');
   const end = addMinutes(start, getService(serviceId).duration_min);
-  if (status === 'booked' && hasOverlap(start, end, appt.id)) throw new HttpError(409, 'That time slot is already taken');
+  if (status === 'booked' && hasOverlap(start, end, appt.id)) throw new HttpError(409, 'That time slot is already taken', 'slot_taken');
 
-  db.prepare('UPDATE appointments SET service_id = ?, start_at = ?, end_at = ?, status = ?, notes = ? WHERE id = ?').run(
-    serviceId, start, end, status, req.body.notes ?? appt.notes, appt.id,
-  );
+  // A rescheduled visit gets a fresh reminder for its new time.
+  const reminderSentAt = start === appt.start_at ? appt.reminder_sent_at : null;
+  db.prepare(
+    'UPDATE appointments SET service_id = ?, start_at = ?, end_at = ?, status = ?, notes = ?, reminder_sent_at = ? WHERE id = ?',
+  ).run(serviceId, start, end, status, req.body.notes ?? appt.notes, reminderSentAt, appt.id);
   res.json(db.prepare(`${SELECT_APPT} WHERE a.id = ?`).get(appt.id));
 });
 
