@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f3ee;
+  --surface: #ffffff;
+  --surface-2: #efe9e2;
+  --foreground: #1f1a17;
+  --muted: #6f655d;
+  --border: #e2d9cf;
+  --accent: #a4572f;
+  --accent-soft: #f3e2d6;
+  --accent-fg: #ffffff;
+  --success: #3d7a4f;
+  --danger: #b4372f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #151210;
+    --surface: #1f1b18;
+    --surface-2: #2a2521;
+    --foreground: #f2ece6;
+    --muted: #a99d93;
+    --border: #3a332d;
+    --accent: #e09a6b;
+    --accent-soft: #3b2a20;
+    --accent-fg: #1f1a17;
+    --success: #7cc08f;
+    --danger: #ef7d73;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-fraunces);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-accent-fg hover:brightness-110;
+}
+@utility btn-ghost {
+  @apply btn border border-border bg-surface hover:bg-surface-2;
+}
+@utility btn-danger {
+  @apply btn border border-danger/40 text-danger hover:bg-danger/10;
+}
+@utility card {
+  @apply rounded-2xl border border-border bg-surface;
+}
+@utility input {
+  @apply w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-[15px] outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-medium text-muted;
+}
